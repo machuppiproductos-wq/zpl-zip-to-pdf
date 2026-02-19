@@ -12,14 +12,23 @@ const upload = multer();
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-function decodeGRF(content) {
-  // Extrai o bloco base64 do formato ~Z64:...
-  const match = content.match(/~Z64:([A-Za-z0-9+/=]+)/);
-  if (!match) return content; // se não for GRF, retorna como está
-
-  const compressed = Buffer.from(match[1], "base64");
-  const decompressed = zlib.inflateRawSync(compressed);
-  return decompressed.toString("utf8");
+function decodeZ64(content) {
+  try {
+    const match = content.match(/:Z64:([A-Za-z0-9+/=]+)/);
+    if (!match) {
+      console.log("Não encontrou Z64, retornando original");
+      return content;
+    }
+    const compressed = Buffer.from(match[1], "base64");
+    console.log("Buffer size:", compressed.length);
+    const decompressed = zlib.inflateSync(compressed);
+    const result = decompressed.toString("utf8");
+    console.log("Decompressed primeiros 200:", result.substring(0, 200));
+    return result;
+  } catch (e) {
+    console.error("Erro no decode Z64:", e.message);
+    return content;
+  }
 }
 
 app.get("/", (req, res) => {
@@ -43,10 +52,7 @@ app.post("/convert", upload.single("file"), async (req, res) => {
 
     for (const fileName of fileNames) {
       let zplContent = await zip.files[fileName].async("string");
-
-      // Decodifica se for GRF
-      zplContent = decodeGRF(zplContent);
-      console.log("Após decode, primeiros 200 chars:", zplContent.substring(0, 200));
+      zplContent = decodeZ64(zplContent);
 
       const labels = zplContent.match(/\^XA[\s\S]*?\^XZ/gi) || [zplContent];
       console.log("Total de etiquetas:", labels.length);
