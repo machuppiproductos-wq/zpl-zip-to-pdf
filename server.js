@@ -4,12 +4,23 @@ const multer = require("multer");
 const JSZip = require("jszip");
 const PDFDocument = require("pdfkit");
 const axios = require("axios");
+const zlib = require("zlib");
 
 const app = express();
 app.use(cors());
 const upload = multer();
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function decodeGRF(content) {
+  // Extrai o bloco base64 do formato ~Z64:...
+  const match = content.match(/~Z64:([A-Za-z0-9+/=]+)/);
+  if (!match) return content; // se não for GRF, retorna como está
+
+  const compressed = Buffer.from(match[1], "base64");
+  const decompressed = zlib.inflateRawSync(compressed);
+  return decompressed.toString("utf8");
+}
 
 app.get("/", (req, res) => {
   res.send("API ZPL ZIP → PDF rodando 🚀");
@@ -31,15 +42,14 @@ app.post("/convert", upload.single("file"), async (req, res) => {
     const images = [];
 
     for (const fileName of fileNames) {
-      const zplContent = await zip.files[fileName].async("string");
+      let zplContent = await zip.files[fileName].async("string");
 
-      // DEBUG
-      console.log("Arquivo:", fileName);
-      console.log("Primeiros 500 caracteres:", zplContent.substring(0, 500));
-      console.log("Total de ^XA encontrados:", (zplContent.match(/\^XA/gi) || []).length);
+      // Decodifica se for GRF
+      zplContent = decodeGRF(zplContent);
+      console.log("Após decode, primeiros 200 chars:", zplContent.substring(0, 200));
 
       const labels = zplContent.match(/\^XA[\s\S]*?\^XZ/gi) || [zplContent];
-      console.log("Total de etiquetas encontradas:", labels.length);
+      console.log("Total de etiquetas:", labels.length);
 
       for (const label of labels) {
         try {
