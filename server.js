@@ -19,35 +19,52 @@ app.post("/convert", upload.single("file"), async (req, res) => {
       return res.status(400).send("Arquivo não enviado");
     }
 
-    // 1️⃣ Descompacta ZIP
     const zip = await JSZip.loadAsync(req.file.buffer);
-    const fileNames = Object.keys(zip.files);
+    const fileNames = Object.keys(zip.files).filter(name => !zip.files[name].dir);
 
     if (fileNames.length === 0) {
       return res.status(400).send("ZIP vazio");
     }
 
-    const zplFile = zip.files[fileNames[0]];
-    const zplContent = await zplFile.async("string");
-
-    // 2️⃣ Converte ZPL em imagem via Labelary
-    const labelaryResponse = await axios.post(
-      "http://api.labelary.com/v1/printers/8dpmm/labels/4x6/0/",
-      zplContent,
-      {
-        responseType: "arraybuffer",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
+    // Converte todas as etiquetas via Labelary
+    const images = [];
+    for (const fileName of fileNames) {
+      const zplContent = await zip.files[fileName].async("string");
+      
+      // Divide por etiqueta (^XA...^XZ)
+      const labels = zplContent.match(/\^XA[\s\S]*?\^XZ/gi) || [zplContent];
+      
+      for (const label of labels) {
+        try {
+          const labelaryResponse = await axios.post(
+            "http://api.labelary.com/v1/printers/8dpmm/labels/4x6/0/",
+            label,
+            {
+              responseType: "arraybuffer",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" }
+            }
+          );
+          images.push(labelaryResponse.data);
+        } catch (e) {
+          console.error("Erro numa etiqueta:", e.message);
         }
       }
-    );
+    }
 
-    // 3️⃣ Cria PDF
-    const doc = new PDFDocument({ size: [288, 432] });
+    if (images.length === 0) {
+      return res.status(500).send("Nenhuma etiqueta convertida");
+    }
+
+    // Gera PDF com uma página por etiqueta
+    const doc = new PDFDocument({ size: [288, 432], autoFirstPage: false });
     res.setHeader("Content-Type", "application/pdf");
-
     doc.pipe(res);
-    doc.image(labelaryResponse.data, 0, 0, { width: 288 });
+
+    for (const imgData of images) {
+      doc.addPage();
+      doc.image(imgData, 0, 0, { width: 288 });
+    }
+
     doc.end();
 
   } catch (error) {
