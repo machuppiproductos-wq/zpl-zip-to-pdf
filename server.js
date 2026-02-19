@@ -3,33 +3,12 @@ const express = require("express");
 const multer = require("multer");
 const JSZip = require("jszip");
 const PDFDocument = require("pdfkit");
-const axios = require("axios");
 const zlib = require("zlib");
+const sharp = require("sharp");
 
 const app = express();
 app.use(cors());
 const upload = multer();
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-function decodeZ64(content) {
-  try {
-    const match = content.match(/:Z64:([A-Za-z0-9+/=]+)/);
-    if (!match) {
-      console.log("Não encontrou Z64, retornando original");
-      return content;
-    }
-    const compressed = Buffer.from(match[1], "base64");
-    console.log("Buffer size:", compressed.length);
-    const decompressed = zlib.inflateSync(compressed);
-    const result = decompressed.toString("utf8");
-    console.log("Decompressed primeiros 200:", result.substring(0, 200));
-    return result;
-  } catch (e) {
-    console.error("Erro no decode Z64:", e.message);
-    return content;
-  }
-}
 
 app.get("/", (req, res) => {
   res.send("API ZPL ZIP → PDF rodando 🚀");
@@ -51,29 +30,34 @@ app.post("/convert", upload.single("file"), async (req, res) => {
     const images = [];
 
     for (const fileName of fileNames) {
-      let zplContent = await zip.files[fileName].async("string");
-      zplContent = decodeZ64(zplContent);
+      const content = await zip.files[fileName].async("string");
 
-      const labels = zplContent.match(/\^XA[\s\S]*?\^XZ/gi) || [zplContent];
-      console.log("Total de etiquetas:", labels.length);
+      // Extrai todos os blocos GRF do arquivo
+      const grfBlocks = [...content.matchAll(/~DGR:[^,]+,(\d+),(\d+),:Z64:([A-Za-z0-9+/=]+)/g)];
+      console.log("Blocos GRF encontrados:", grfBlocks.length);
 
-      for (const label of labels) {
+      for (const block of grfBlocks) {
         try {
-          await sleep(300);
-          const labelaryResponse = await axios.post(
-            "http://api.labelary.com/v1/printers/8dpmm/labels/4x6/0/",
-            label.trim(),
-            {
-              responseType: "arraybuffer",
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "image/png"
-              }
-            }
-          );
-          images.push(labelaryResponse.data);
+          const totalBytes = parseInt(block[1]);
+          const rowBytes = parseInt(block[2]);
+          const compressed = Buffer.from(block[3], "base64");
+          const bitmap = zlib.inflateSync(compressed);
+
+          const width = rowBytes * 8;
+          const height = Math.floor(totalBytes / rowBytes);
+
+          console.log(`GRF: ${width}x${height}, bytes: ${bitmap.length}`);
+
+          // Converte bitmap 1-bit para PNG via sharp
+          const png = await sharp(bitmap, {
+            raw: { width, height, channels: 1 }
+          })
+            .png()
+            .toBuffer();
+
+          images.push(png);
         } catch (e) {
-          console.error("Erro numa etiqueta:", e.message);
+          console.error("Erro num bloco GRF:", e.message);
         }
       }
     }
