@@ -1,3 +1,4 @@
+const cors = require("cors");
 const express = require("express");
 const multer = require("multer");
 const JSZip = require("jszip");
@@ -5,6 +6,7 @@ const PDFDocument = require("pdfkit");
 const axios = require("axios");
 
 const app = express();
+app.use(cors());
 const upload = multer();
 
 app.get("/", (req, res) => {
