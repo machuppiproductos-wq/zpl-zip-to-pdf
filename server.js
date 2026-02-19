@@ -9,6 +9,8 @@ const app = express();
 app.use(cors());
 const upload = multer();
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 app.get("/", (req, res) => {
   res.send("API ZPL ZIP → PDF rodando 🚀");
 });
@@ -26,22 +28,24 @@ app.post("/convert", upload.single("file"), async (req, res) => {
       return res.status(400).send("ZIP vazio");
     }
 
-    // Converte todas as etiquetas via Labelary
     const images = [];
+
     for (const fileName of fileNames) {
       const zplContent = await zip.files[fileName].async("string");
-      
-      // Divide por etiqueta (^XA...^XZ)
       const labels = zplContent.match(/\^XA[\s\S]*?\^XZ/gi) || [zplContent];
-      
+
       for (const label of labels) {
         try {
+          await sleep(300);
           const labelaryResponse = await axios.post(
             "http://api.labelary.com/v1/printers/8dpmm/labels/4x6/0/",
-            label,
+            label.trim(),
             {
               responseType: "arraybuffer",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" }
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "image/png"
+              }
             }
           );
           images.push(labelaryResponse.data);
@@ -55,7 +59,6 @@ app.post("/convert", upload.single("file"), async (req, res) => {
       return res.status(500).send("Nenhuma etiqueta convertida");
     }
 
-    // Gera PDF com uma página por etiqueta
     const doc = new PDFDocument({ size: [288, 432], autoFirstPage: false });
     res.setHeader("Content-Type", "application/pdf");
     doc.pipe(res);
