@@ -19,8 +19,7 @@ function expand1bitTo8bit(bitmap) {
   for (let i = 0; i < bitmap.length; i++) {
     const byte = bitmap[i];
     for (let bit = 0; bit < 8; bit++) {
-      // bit mais significativo primeiro, 0=preto, 1=branco
-      expanded[i * 8 + bit] = (byte & (0x80 >> bit)) ? 255 : 0;
+      expanded[i * 8 + bit] = (byte & (0x80 >> bit)) ? 0 : 255; // invertido!
     }
   }
   return expanded;
@@ -55,6 +54,7 @@ app.post("/convert", upload.single("file"), async (req, res) => {
 
           const width = rowBytes * 8;
           const height = Math.floor(totalBytes / rowBytes);
+
           console.log(`GRF: ${width}x${height}`);
 
           const expanded = expand1bitTo8bit(bitmap);
