@@ -32,7 +32,14 @@ app.post("/convert", upload.single("file"), async (req, res) => {
 
     for (const fileName of fileNames) {
       const zplContent = await zip.files[fileName].async("string");
+
+      // DEBUG
+      console.log("Arquivo:", fileName);
+      console.log("Primeiros 500 caracteres:", zplContent.substring(0, 500));
+      console.log("Total de ^XA encontrados:", (zplContent.match(/\^XA/gi) || []).length);
+
       const labels = zplContent.match(/\^XA[\s\S]*?\^XZ/gi) || [zplContent];
+      console.log("Total de etiquetas encontradas:", labels.length);
 
       for (const label of labels) {
         try {
