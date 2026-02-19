@@ -14,6 +14,18 @@ app.get("/", (req, res) => {
   res.send("API ZPL ZIP → PDF rodando 🚀");
 });
 
+function expand1bitTo8bit(bitmap) {
+  const expanded = Buffer.alloc(bitmap.length * 8);
+  for (let i = 0; i < bitmap.length; i++) {
+    const byte = bitmap[i];
+    for (let bit = 0; bit < 8; bit++) {
+      // bit mais significativo primeiro, 0=preto, 1=branco
+      expanded[i * 8 + bit] = (byte & (0x80 >> bit)) ? 255 : 0;
+    }
+  }
+  return expanded;
+}
+
 app.post("/convert", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -31,8 +43,6 @@ app.post("/convert", upload.single("file"), async (req, res) => {
 
     for (const fileName of fileNames) {
       const content = await zip.files[fileName].async("string");
-
-      // Extrai todos os blocos GRF do arquivo
       const grfBlocks = [...content.matchAll(/~DGR:[^,]+,(\d+),(\d+),:Z64:([A-Za-z0-9+/=]+)/g)];
       console.log("Blocos GRF encontrados:", grfBlocks.length);
 
@@ -45,11 +55,11 @@ app.post("/convert", upload.single("file"), async (req, res) => {
 
           const width = rowBytes * 8;
           const height = Math.floor(totalBytes / rowBytes);
+          console.log(`GRF: ${width}x${height}`);
 
-          console.log(`GRF: ${width}x${height}, bytes: ${bitmap.length}`);
+          const expanded = expand1bitTo8bit(bitmap);
 
-          // Converte bitmap 1-bit para PNG via sharp
-          const png = await sharp(bitmap, {
+          const png = await sharp(expanded, {
             raw: { width, height, channels: 1 }
           })
             .png()
