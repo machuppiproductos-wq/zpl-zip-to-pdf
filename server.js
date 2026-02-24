@@ -26,6 +26,33 @@ app.get("/auth-shopee", (req, res) => {
   res.redirect(authUrl);
 });
 
+app.get("/get-token", async (req, res) => {
+  const partnerId = 1221266;
+  const partnerKey = 'shpk756253597879624570546d4e696b4c5473777258586458797364616b7263';
+  const code = req.query.code;
+  const shopId = parseInt(req.query.shop_id);
+  const timestamp = Math.floor(Date.now() / 1000);
+  const path = '/api/v2/auth/token/get';
+  const baseString = partnerId + path + timestamp;
+  const sign = crypto.createHmac('sha256', partnerKey).update(baseString).digest('hex');
+
+  const url = `https://openplatform.sandbox.test-stable.shopee.sg${path}?partner_id=${partnerId}&timestamp=${timestamp}&sign=${sign}`;
+
+  const body = { code, shop_id: shopId, partner_id: partnerId };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 function expand1bitTo8bit(bitmap) {
   const expanded = Buffer.alloc(bitmap.length * 8);
   for (let i = 0; i < bitmap.length; i++) {
