@@ -11,41 +11,61 @@ const app = express();
 app.use(cors());
 const upload = multer();
 
+const PARTNER_ID = 1221266;
+const PARTNER_KEY = 'shpk756253597879624570546d4e696b4c5473777258586458797364616b7263';
+const SANDBOX_HOST = 'https://openplatform.sandbox.test-stable.shopee.sg';
+
+function gerarSign(path, timestamp, accessToken = '', shopId = '') {
+  const baseString = PARTNER_ID + path + timestamp + accessToken + shopId;
+  return crypto.createHmac('sha256', PARTNER_KEY).update(baseString).digest('hex');
+}
+
 app.get("/", (req, res) => {
   res.send("API ZPL ZIP → PDF rodando 🚀");
 });
 
 app.get("/auth-shopee", (req, res) => {
-  const partnerId = '1221266';
-  const partnerKey = 'shpk756253597879624570546d4e696b4c5473777258586458797364616b7263';
-  const redirectUrl = 'https://retool.com';
   const timestamp = Math.floor(Date.now() / 1000);
-  const baseString = partnerId + '/api/v2/shop/auth_partner' + timestamp;
-  const sign = crypto.createHmac('sha256', partnerKey).update(baseString).digest('hex');
-  const authUrl = `https://openplatform.sandbox.test-stable.shopee.sg/api/v2/shop/auth_partner?partner_id=${partnerId}&timestamp=${timestamp}&sign=${sign}&redirect=${redirectUrl}`;
+  const sign = gerarSign('/api/v2/shop/auth_partner', timestamp);
+  const authUrl = `${SANDBOX_HOST}/api/v2/shop/auth_partner?partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}&redirect=https://retool.com`;
   res.redirect(authUrl);
 });
 
 app.get("/get-token", async (req, res) => {
-  const partnerId = 1221266;
-  const partnerKey = 'shpk756253597879624570546d4e696b4c5473777258586458797364616b7263';
   const code = req.query.code;
   const shopId = parseInt(req.query.shop_id);
   const timestamp = Math.floor(Date.now() / 1000);
   const path = '/api/v2/auth/token/get';
-  const baseString = partnerId + path + timestamp;
-  const sign = crypto.createHmac('sha256', partnerKey).update(baseString).digest('hex');
-
-  const url = `https://openplatform.sandbox.test-stable.shopee.sg${path}?partner_id=${partnerId}&timestamp=${timestamp}&sign=${sign}`;
-
-  const body = { code, shop_id: shopId, partner_id: partnerId };
-
+  const sign = gerarSign(path, timestamp);
+  const url = `${SANDBOX_HOST}${path}?partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}`;
   try {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ code, shop_id: shopId, partner_id: PARTNER_ID })
     });
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/get-orders", async (req, res) => {
+  const accessToken = req.query.access_token;
+  const shopId = parseInt(req.query.shop_id);
+  const timestamp = Math.floor(Date.now() / 1000);
+  const path = '/api/v2/order/get_order_list';
+  const sign = gerarSign(path, timestamp, accessToken, shopId);
+
+  // Busca pedidos dos últimos 15 dias
+  const timeFrom = Math.floor(Date.now() / 1000) - (15 * 24 * 60 * 60);
+  const timeTo = Math.floor(Date.now() / 1000);
+
+  const url = `${SANDBOX_HOST}${path}?partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}&access_token=${accessToken}&shop_id=${shopId}&time_range_field=create_time&time_from=${timeFrom}&time_to=${timeTo}&page_size=50&response_optional_fields=order_status`;
+
+  try {
+    const response = await fetch(url);
     const data = await response.json();
     res.json(data);
   } catch (error) {
