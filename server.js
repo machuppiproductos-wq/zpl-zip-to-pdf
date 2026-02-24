@@ -22,7 +22,7 @@ app.get("/auth-shopee", (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const baseString = partnerId + '/api/v2/shop/auth_partner' + timestamp;
   const sign = crypto.createHmac('sha256', partnerKey).update(baseString).digest('hex');
-  const authUrl = `https://partner.test-stable.shopeemobile.com/api/v2/shop/auth_partner?partner_id=${partnerId}&timestamp=${timestamp}&sign=${sign}&redirect=${redirectUrl}`;
+  const authUrl = `https://openplatform.sandbox.test-stable.shopee.sg/api/v2/shop/auth_partner?partner_id=${partnerId}&timestamp=${timestamp}&sign=${sign}&redirect=${redirectUrl}`;
   res.redirect(authUrl);
 });
 
