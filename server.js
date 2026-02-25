@@ -11,12 +11,10 @@ const app = express();
 app.use(cors());
 const upload = multer();
 
-// Credenciais de produção
 const PARTNER_ID = 2030540;
 const PARTNER_KEY = 'shpk44437a4d787570514b4f67774a5572466b476b5565686153746e674e5a68';
 const LIVE_HOST = 'https://partner.shopeemobile.com';
 
-// Credenciais sandbox (mantidas para referência)
 const SANDBOX_PARTNER_ID = 1221266;
 const SANDBOX_PARTNER_KEY = 'shpk756253597879624570546d4e696b4c5473777258586458797364616b7263';
 const SANDBOX_HOST = 'https://openplatform.sandbox.test-stable.shopee.sg';
@@ -73,7 +71,10 @@ app.get("/get-orders", async (req, res) => {
   const path = '/api/v2/order/get_order_list';
   const sign = gerarSign(path, timestamp, accessToken, shopId);
 
-  const timeFrom = Math.floor(Date.now() / 1000) - (15 * 24 * 60 * 60);
+  // Usa time_from passado como parâmetro, ou padrão de 15 dias
+  const timeFrom = req.query.time_from 
+    ? parseInt(req.query.time_from) 
+    : Math.floor(Date.now() / 1000) - (15 * 24 * 60 * 60);
   const timeTo = Math.floor(Date.now() / 1000);
 
   const url = `${LIVE_HOST}${path}?partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}&access_token=${accessToken}&shop_id=${shopId}&time_range_field=create_time&time_from=${timeFrom}&time_to=${timeTo}&page_size=50&response_optional_fields=order_status`;
@@ -90,7 +91,7 @@ app.get("/get-orders", async (req, res) => {
 app.get("/get-order-details", async (req, res) => {
   const accessToken = req.query.access_token;
   const shopId = parseInt(req.query.shop_id);
-  const orderSns = req.query.order_sn_list; // separados por vírgula, máx 50
+  const orderSns = req.query.order_sn_list;
   const timestamp = Math.floor(Date.now() / 1000);
   const path = '/api/v2/order/get_order_detail';
   const sign = gerarSign(path, timestamp, accessToken, shopId);
