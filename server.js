@@ -32,7 +32,6 @@ app.get("/", (req, res) => {
   res.send("API ZPL ZIP → PDF rodando 🚀");
 });
 
-// Auth produção
 app.get("/auth-shopee", (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const sign = gerarSign('/api/v2/shop/auth_partner', timestamp);
@@ -40,7 +39,6 @@ app.get("/auth-shopee", (req, res) => {
   res.redirect(authUrl);
 });
 
-// Auth sandbox (mantido para testes)
 app.get("/auth-shopee-sandbox", (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const sign = gerarSign('/api/v2/shop/auth_partner', timestamp, '', '', true);
@@ -48,7 +46,6 @@ app.get("/auth-shopee-sandbox", (req, res) => {
   res.redirect(authUrl);
 });
 
-// Get token produção
 app.get("/get-token", async (req, res) => {
   const code = req.query.code;
   const shopId = parseInt(req.query.shop_id);
@@ -69,7 +66,6 @@ app.get("/get-token", async (req, res) => {
   }
 });
 
-// Get orders produção
 app.get("/get-orders", async (req, res) => {
   const accessToken = req.query.access_token;
   const shopId = parseInt(req.query.shop_id);
@@ -81,6 +77,25 @@ app.get("/get-orders", async (req, res) => {
   const timeTo = Math.floor(Date.now() / 1000);
 
   const url = `${LIVE_HOST}${path}?partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}&access_token=${accessToken}&shop_id=${shopId}&time_range_field=create_time&time_from=${timeFrom}&time_to=${timeTo}&page_size=50&response_optional_fields=order_status`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/get-order-details", async (req, res) => {
+  const accessToken = req.query.access_token;
+  const shopId = parseInt(req.query.shop_id);
+  const orderSns = req.query.order_sn_list; // separados por vírgula, máx 50
+  const timestamp = Math.floor(Date.now() / 1000);
+  const path = '/api/v2/order/get_order_detail';
+  const sign = gerarSign(path, timestamp, accessToken, shopId);
+
+  const url = `${LIVE_HOST}${path}?partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}&access_token=${accessToken}&shop_id=${shopId}&order_sn_list=${orderSns}&response_optional_fields=buyer_user_id,buyer_username,estimated_shipping_fee,recipient_address,actual_shipping_fee,goods_to_declare,note,note_update_time,item_list,pay_time,dropshipper,dropshipper_phone,split_up,buyer_cancel_reason,cancel_by,cancel_reason,actual_shipping_fee_confirmed,buyer_cpf_id,fulfillment_flag,pickup_done_time,package_list,shipping_carrier,payment_method,total_amount,buyer_username,invoice_data`;
 
   try {
     const response = await fetch(url);
