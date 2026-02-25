@@ -64,6 +64,26 @@ app.get("/get-token", async (req, res) => {
   }
 });
 
+app.get("/refresh-token", async (req, res) => {
+  const refreshToken = req.query.refresh_token;
+  const shopId = parseInt(req.query.shop_id);
+  const timestamp = Math.floor(Date.now() / 1000);
+  const path = '/api/v2/auth/access_token/get';
+  const sign = gerarSign(path, timestamp);
+  const url = `${LIVE_HOST}${path}?partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken, shop_id: shopId, partner_id: PARTNER_ID })
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/get-orders", async (req, res) => {
   const accessToken = req.query.access_token;
   const shopId = parseInt(req.query.shop_id);
@@ -71,7 +91,6 @@ app.get("/get-orders", async (req, res) => {
   const path = '/api/v2/order/get_order_list';
   const sign = gerarSign(path, timestamp, accessToken, shopId);
 
-  // Usa time_from passado como parâmetro, ou padrão de 15 dias
   const timeFrom = req.query.time_from 
     ? parseInt(req.query.time_from) 
     : Math.floor(Date.now() / 1000) - (15 * 24 * 60 * 60);
